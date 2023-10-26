@@ -126,7 +126,7 @@ def MultiViewSR(
 
         evaluator_i.Optimizer = optimizers[-1]
 
-        # evaluator_i.LocalOptimizationIterations = 100
+        #evaluator_i.LocalOptimizationIterations = 100
         evaluators.append(evaluator_i)
 
         if use_single_view is None:
@@ -159,13 +159,13 @@ def MultiViewSR(
         seed=seed,
         time_limit=86400,
     )
-
+    
     # define how the offspring are merged back into the population - here we replace the worst parents with the best offspring
     reinserter = Operon.ReplaceWorstReinserter(objective_index=0)
     gp = Operon.GeneticProgrammingAlgorithm(
         problems[0], config, tree_initializer, coeff_initializer, generator, reinserter
     )
-
+    
     # report some progress
     gen = 0
     max_ticks = 50
@@ -185,16 +185,21 @@ def MultiViewSR(
     agg_model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
 
     scores = []
+
     if verbose:
         print("Agg. estimator: ", aggregateEvaluator(rng, best))
         print(f"{sp.sympify(agg_model_string)}\n")
+
+    minimized = []
+
     for i, e in enumerate(evaluators):
         scores.append(e(rng, best))
-        model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
 
         if verbose:
             print(e.CallCount, e.ResidualEvaluations, e.JacobianEvaluations)
             print(f"Eval. {i}: ", e(rng, best))
-            print(f"{sp.sympify(model_string)}\n")
+            model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
+            print(f"{sp.N(model_string, 4)}\n")
+
 
     return agg_model_string, scores

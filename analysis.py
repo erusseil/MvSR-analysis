@@ -5,7 +5,7 @@ import mvsr as mvsr
 import shutil
 import json
 import pandas as pd
-
+import pyoperon as Operon
 
 def create_folders(name, noises):
     """
@@ -73,7 +73,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
                 use_single_view=use_single_view,
                 **settings,
             )
-            results.iloc[seed] = [result[0], result[1]]
+            results.iloc[seed] = [result[0], [round(i[0], 3) for i in result[1]]]
 
         if use_single_view is not None:
             results.to_csv(
@@ -98,18 +98,23 @@ def run_analysis(name, nseeds, settings):
     create_folders(name, noises)
 
     with open(f"toy_results/{name}/settings.txt", "w") as f:
-        f.write(json.dumps(settings))
+        save_settings = settings.copy()
+        save_settings["OperationSet"] = str(save_settings["OperationSet"])
+        f.write(json.dumps(save_settings))
 
     run_mvsr(name, nseeds, settings)
     run_single_view(name, nseeds, settings)
 
 
 if __name__ == "__main__":
+
+    nseeds = 10
+    
     polynomial_settings = {
         "generations": 1000,
-        "maxL": 15,
+        "maxL": 20,
         "maxD": 10,
-        "OperationSet": None,
+        "OperationSet": Operon.NodeType.Square,
     }
 
-    run_analysis("polynomial", 5, polynomial_settings)
+    run_analysis("polynomial", nseeds, polynomial_settings)

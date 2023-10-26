@@ -86,6 +86,6 @@ def generate_data(func, name, params, noises, npoints=25):
 
 if __name__ == "__main__":
     noises = [0.05]  # , .1, .5
-    generate_data(func_poly, "polynomial", [[0, 1, 1], [1, 0, 1], [1, 1, 0]], noises)
-    generate_data(func_sin, "sinus", [[1, 0], [1, 1], [0, 1]], noises)
-    generate_data(func_gaussian, "gaussian", [[1, 0.5], [0.5, 1], [0, 2]], noises)
+    generate_data(func_poly, "polynomial", [[0, 2, 2], [2, 0, 2], [2, 2, 0]], noises)
+    generate_data(func_sin, "sinus", [[2, 0], [2, 2], [0, 2]], noises)
+    generate_data(func_gaussian, "gaussian", [[2, 0.5], [0.5, 2], [0, 4]], noises)
