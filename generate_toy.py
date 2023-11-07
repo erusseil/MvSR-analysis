@@ -10,23 +10,26 @@ import shutil
 global_rng = default_rng(seed=0)
 
 
-def func_sin(npoints, A, B):
-    X = np.linspace(-0.5 * np.pi, 0.5 * np.pi, npoints)
-    return X, A * np.sin(X + B)
+def func_poly(X, A, B, C):
+    return A + B * X + C * X**2
 
-
-def func_poly(npoints, A, B, C):
-    X = np.linspace(-2, 2, npoints)
-    return X, A + B * X + C * X**2
-
-
-def func_gaussian(npoints, mu, sig):
-    X = np.linspace(-1, 1, npoints)
-    return X, (
-        1.0 / (np.sqrt(2.0 * np.pi) * sig) * np.exp(-np.power((X - mu) / sig, 2.0) / 2)
+def func_gaussian(X, A, mu, sig):
+    return (
+        A / (np.sqrt(2.0 * np.pi) * sig) * np.exp(-np.power((X - mu) / sig, 2.0) / 2)
     )
 
+def func_fried1(X, A, B, C, D):
+    # Original functional form comes from here :
+    # https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_friedman1.html
+    # The function was modified to incorporate 4 free parameters (and remove constants)
+    return np.sin(A * X[:, 0] * X[:, 1]) + B * (X[:, 2] - C) ** 2 + D * X[:, 3] + X[:, 4]
 
+def func_fried2(X, A, B, C, D):
+    # Original functional form comes from here :
+    # https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_friedman2.html
+    # The function was modified to incorporate 4 free parameters
+    return A * (B * X[:, 0] ** 2 + C + (D * X[:, 1] * X[:, 2]  - 1 / (X[:, 1] * X[:, 3])) ** 2) ** 0.5
+    
 def gaussian_noise(y, rng, noise_ratio):
     sigma = np.std(y) * np.sqrt(noise_ratio / (1.0 - noise_ratio))
     return rng.normal(loc=0.0, scale=sigma, size=len(y))
@@ -51,12 +54,13 @@ def create_folders(name, noises):
             os.makedirs(f"toy_data/{name}/noisy_{noise}")
 
 
-def generate_data(func, name, params, noises, npoints=25):
+def generate_data(func, name, Xs, params, noises, npoints=25):
     header = ["Xaxis", "yaxis"]
     create_folders(name, noises)
 
     for idx, param in enumerate(params):
-        x, y = func(npoints, *param)
+        x = Xs[idx]
+        y = func(x, *param)
         example = np.vstack((x, y)).T
 
         with open(
@@ -86,6 +90,30 @@ def generate_data(func, name, params, noises, npoints=25):
 
 if __name__ == "__main__":
     noises = [0.05]  # , .1, .5
-    generate_data(func_poly, "polynomial", [[0, 2, 2], [2, 0, 2], [2, 2, 0]], noises)
-    generate_data(func_sin, "sinus", [[2, 0], [2, 2], [0, 2]], noises)
-    generate_data(func_gaussian, "gaussian", [[2, 0.5], [0.5, 2], [0, 4]], noises)
+
+
+    # Generate polynomial data : 
+    step = 0.1
+    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-0, 1], [-2, -1]]
+    
+    for lim in Xs_lim:
+        Xs.append(np.arange(lim[0], lim[1], step))
+    
+    generate_data(func_poly, "polynomial", Xs, [[-2, 2, 0],[2, 0, -2],[2, 2, 2],[-2, -2, -2]], noises)
+
+    # Generate gaussian data :
+    step = 0.1
+    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-2, .5], [-.5, 2]]
+    
+    for lim in Xs_lim:
+        Xs.append(np.arange(lim[0], lim[1], step))
+        
+    generate_data(func_gaussian, "gaussian", Xs, [[0, 2, 2], [2, 0, .5], [.5, .5, .5], [2, -.5, .5]], noises)
+
+
+    #generate_data(func_poly, "friedman1", [[0, 2, 2], [2, 0, 2], [2, 2, 0]], noises)
+    #generate_data(func_gaussian, "friedman2", [[2, 0.5], [0.5, 2], [0, 4]], noises)
+
+
+
+
