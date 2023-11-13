@@ -7,6 +7,10 @@ import json
 import pandas as pd
 import pyoperon as Operon
 import sympy as sp
+import time
+import sympy as sp
+import string
+import re
 
 
 def refit_solution(expression, name, example):
@@ -19,10 +23,35 @@ def refit_solution(expression, name, example):
     with open(model_path, 'w') as f:
         f.write(expression)
 
-    stream = os.popen('srtree-opt -f operon -i {0} -d {1} --hasheader --restart --simplify --niter 100 --distribution gaussian'.format(model_path, example_path))
-    output = stream.read()
+    outputs = []
+    no_perfect_yet = True
+    for _ in range(10):
+        if no_perfect_yet:
+            stream = os.popen('srtree-opt -f operon -i {0} -d {1} --hasheader --restart --niter 100 --distribution gaussian'.format(model_path, example_path))
+            outputs.append(stream.read())
+            no_perfect_yet = round(find_sse(outputs[-1]), 3) != 0
+
+    output = outputs[np.argmin(np.array([find_sse(i) for i in outputs]))]
+    print([find_sse(i) for i in outputs], "      :     ", find_sse(output))
     os.remove(model_path)
-    return find_expression(output), round(find_sse(output)/npoints, 3)
+    return round(find_sse(output)/npoints, 3)
+
+def convert_string_to_func(SR_str):
+    alphabet = list(string.ascii_uppercase)
+    parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
+    parameters_dict = {}
+    function_str = str(sp.N(sp.sympify(SR_str), 50))
+    all_floats = re.findall("\d+\.\d+", function_str)
+
+    if len(all_floats)>len(parameter_names):
+        print('WARNING WAY TOO BIG FUNCTIONS')
+        return function_str, False
+        
+    for idx, one_float in enumerate(all_floats):
+        function_str = function_str.replace(one_float, parameter_names[idx], 1)
+        parameters_dict[parameter_names[idx]] = float(one_float)
+        
+    return function_str
 
 def replace_wrong_symbols(expression):
     expression = expression.replace("^", "**")
@@ -141,13 +170,14 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
                 **settings,
             )
 
-            exp_refit, mse_refit = [], []
+            mse_refit = []
             for example in examples:
+                before = time.time()
                 refit = refit_solution(result[0], name, example)
-                exp_refit.append(refit[0])
-                mse_refit.append(refit[1])
+                duration = time.time()-before
+                mse_refit.append(refit)
 
-            results.iloc[seed] = [exp_refit, mse_refit]
+            results.iloc[seed] = [convert_string_to_func(result[0]), mse_refit]
 
         if use_single_view is not None:
             results.to_csv(
@@ -158,6 +188,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
         else:
             results.to_csv(f"toy_results/{name}/{noise}/MvSR_results.csv", index=False)
 
+        print(f"Noise {noise} done !")
 
 def run_single_view(name, nseeds, settings):
     path = f"toy_data/{name}/perfect/"
@@ -186,8 +217,8 @@ if __name__ == "__main__":
     
     polynomial_settings = {
         "generations": 1000,
-        "maxL": 20,
-        "maxD": 10,
+        "maxL": 50,
+        "maxD": 20,
         "OperationSet": None,
     }
 
