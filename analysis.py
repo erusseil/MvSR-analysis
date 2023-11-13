@@ -13,6 +13,14 @@ import string
 import re
 
 
+def single_refit(model_path, example_path, outputs, gauss=' --distribution gaussian',\
+                 restart=' --restart', simplify=' --simplify'):
+    
+    stream = os.popen('srtree-opt -f operon -i {0} -d {1} --hasheader --niter 100{2}{3}{4}'.format(model_path, example_path, gauss, restart, simplify))
+    outputs.append(stream.read())
+    no_perfect_yet = round(find_sse(outputs[-1]), 3) != 0
+    return outputs, no_perfect_yet
+
 def refit_solution(expression, name, example):
     
     example_path = f"toy_data/{name}/perfect/{example}"
@@ -25,14 +33,35 @@ def refit_solution(expression, name, example):
 
     outputs = []
     no_perfect_yet = True
-    for _ in range(10):
-        if no_perfect_yet:
-            stream = os.popen('srtree-opt -f operon -i {0} -d {1} --hasheader --restart --niter 100 --distribution gaussian'.format(model_path, example_path))
-            outputs.append(stream.read())
-            no_perfect_yet = round(find_sse(outputs[-1]), 3) != 0
 
-    output = outputs[np.argmin(np.array([find_sse(i) for i in outputs]))]
-    print([find_sse(i) for i in outputs], "      :     ", find_sse(output))
+    # All options on
+    outputs, no_perfect_yet = single_refit(model_path, example_path, outputs)
+    # All without some options but with restart !
+    if no_perfect_yet:
+        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='')
+    if no_perfect_yet:
+        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='')
+    if no_perfect_yet:
+        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', simplify='')
+
+    for _ in range(20):
+        if no_perfect_yet:
+            if _ % 4 == 0:
+                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', simplify='', restart='')
+            elif _ % 4 == 1:
+                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='', restart='')
+            elif _ % 4 == 2:     
+                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', restart='')
+            else:
+                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, restart='')
+                
+    errors = np.array([find_sse(i) for i in outputs])
+    errors = errors[errors==errors]
+    if len(errors) != 0:
+        output = outputs[np.argmin(errors[errors==errors])]
+    else: 
+        return np.nan
+        
     os.remove(model_path)
     return round(find_sse(output)/npoints, 3)
 
@@ -100,7 +129,7 @@ def find_sse(output):
     return float(output[start:stop])
 
 
-def create_folders(name, noises):
+def create_folders(name, noises, settings):
     """
     Creates folders associated to the function
 
@@ -115,16 +144,20 @@ def create_folders(name, noises):
     if not os.path.exists("toy_results"):
         os.makedirs("toy_results")
 
-    # Delete previous data if it exists
-    if os.path.isdir(f"toy_results/{name}"):
-        shutil.rmtree(f"toy_results/{name}")
-
     if not os.path.exists(f"toy_results/{name}"):
         os.makedirs(f"toy_results/{name}")
 
     for noise in noises:
         if not os.path.exists(f"toy_results/{name}/{noise}"):
             os.makedirs(f"toy_results/{name}/{noise}")
+        for maxL in settings['maxL']:
+
+            # Delete previous data if it exists
+            if os.path.isdir(f"toy_results/{name}/{noise}/max{maxL}"):
+                shutil.rmtree(f"toy_results/{name}/{noise}/max{maxL}")
+        
+            if not os.path.exists(f"toy_results/{name}/{noise}/max{maxL}"):
+                os.makedirs(f"toy_results/{name}/{noise}/max{maxL}")
 
 
 def run_mvsr(name, nseeds, settings, use_single_view=None):
@@ -181,12 +214,12 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
 
         if use_single_view is not None:
             results.to_csv(
-                f"toy_results/{name}/{noise}/example{use_single_view}_results.csv",
+                f"toy_results/{name}/{noise}/max{settings['maxL']}/example{use_single_view}_results.csv",
                 index=False,
             )
 
         else:
-            results.to_csv(f"toy_results/{name}/{noise}/MvSR_results.csv", index=False)
+            results.to_csv(f"toy_results/{name}/{noise}/max{settings['maxL']}/MvSR_results.csv", index=False)
 
         print(f"Noise {noise} done !")
 
@@ -200,15 +233,18 @@ def run_single_view(name, nseeds, settings):
 
 def run_analysis(name, nseeds, settings):
     noises = os.listdir(f"toy_data/{name}")
-    create_folders(name, noises)
+    create_folders(name, noises, settings)
 
     with open(f"toy_results/{name}/settings.txt", "w") as f:
         save_settings = settings.copy()
         save_settings["OperationSet"] = str(save_settings["OperationSet"])
         f.write(json.dumps(save_settings))
 
-    run_mvsr(name, nseeds, settings)
-    run_single_view(name, nseeds, settings)
+    for maxL in settings['maxL']:
+        setting = settings.copy()
+        setting['maxL'] = maxL
+        run_mvsr(name, nseeds, setting)
+        run_single_view(name, nseeds, setting)
 
 
 if __name__ == "__main__":
@@ -217,7 +253,7 @@ if __name__ == "__main__":
     
     polynomial_settings = {
         "generations": 1000,
-        "maxL": 50,
+        "maxL": [20, 40, 60],
         "maxD": 20,
         "OperationSet": None,
     }
