@@ -5,8 +5,6 @@ import pyoperon as Operon
 import random, time, sys, os, json
 from scipy import stats
 import sympy as sp
-import matplotlib.pyplot as plt
-
 
 def MultiViewSR(
     path,
