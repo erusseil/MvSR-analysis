@@ -21,10 +21,10 @@ def single_refit(model_path, example_path, outputs, gauss=' --distribution gauss
     no_perfect_yet = round(find_sse(outputs[-1]), 3) != 0
     return outputs, no_perfect_yet
 
-def refit_solution(expression, name, example):
+def refit_solution(expression, name, example, noise, maxL):
     
     example_path = f"toy_data/{name}/perfect/{example}"
-    model_path = f"toy_results/{name}/operon_{example[:-4]}.models"
+    model_path = f"toy_results/{name}/{noise}/max{maxL}/operon_{example[:-4]}.models"
     
     npoints = len(pd.read_csv(example_path))
     
@@ -126,6 +126,7 @@ def find_sse(output):
         start = output.find(',', start) + 1
     
     stop = output.find(',', start)
+
     return float(output[start:stop])
 
 
@@ -206,7 +207,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
             mse_refit = []
             for example in examples:
                 before = time.time()
-                refit = refit_solution(result[0], name, example)
+                refit = refit_solution(result[0], name, example, noise, settings['maxL'])
                 duration = time.time()-before
                 mse_refit.append(refit)
 
@@ -221,14 +222,13 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
         else:
             results.to_csv(f"toy_results/{name}/{noise}/max{settings['maxL']}/MvSR_results.csv", index=False)
 
-        print(f"Noise {noise} done !")
-
 def run_single_view(name, nseeds, settings):
     path = f"toy_data/{name}/perfect/"
     all_examples = [x for x in os.listdir(path) if "csv" in x]
 
     for example in range(len(all_examples)):
         run_mvsr(name, nseeds, settings, use_single_view=example)
+        print(f"Example {example} Done !")
 
 
 def run_analysis(name, nseeds, settings):
@@ -244,6 +244,7 @@ def run_analysis(name, nseeds, settings):
         setting = settings.copy()
         setting['maxL'] = maxL
         run_mvsr(name, nseeds, setting)
+        print("Multiview Done !")
         run_single_view(name, nseeds, setting)
 
 
@@ -253,8 +254,8 @@ if __name__ == "__main__":
     
     polynomial_settings = {
         "generations": 1000,
-        "maxL": [20, 40, 60],
-        "maxD": 20,
+        "maxL": [40],
+        "maxD": 10,
         "OperationSet": None,
     }
 
