@@ -35,25 +35,19 @@ def refit_solution(expression, name, example, noise, maxL):
     no_perfect_yet = True
 
     # All options on
-    outputs, no_perfect_yet = single_refit(model_path, example_path, outputs)
+    outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, restart='')
     # All without some options but with restart !
     if no_perfect_yet:
-        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='')
+        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', restart='')
     if no_perfect_yet:
-        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='')
+        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='', restart='')
     if no_perfect_yet:
-        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', simplify='')
+        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', simplify='', restart='')
 
-    for _ in range(20):
+    for _ in range(10):
         if no_perfect_yet:
-            if _ % 4 == 0:
-                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', simplify='', restart='')
-            elif _ % 4 == 1:
-                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='', restart='')
-            elif _ % 4 == 2:     
-                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', restart='')
-            else:
-                outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, restart='')
+            outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='', gauss='')
+
                 
     errors = np.array([find_sse(i) for i in outputs])
     errors = errors[errors==errors]
@@ -61,6 +55,9 @@ def refit_solution(expression, name, example, noise, maxL):
         output = outputs[np.argmin(errors[errors==errors])]
     else: 
         return np.nan
+
+    if output=='':
+        print(expression, 'is weird')
         
     os.remove(model_path)
     return round(find_sse(output)/npoints, 3)
@@ -185,11 +182,10 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
     """
 
     noises = os.listdir(f"toy_data/{name}")
-    examples = os.listdir(f"toy_data/{name}/perfect")
-    ndim = np.shape(pd.read_csv(f"toy_data/{name}/perfect/{examples[0]}"))[1]
+    examples = sorted(os.listdir(f"toy_data/{name}/perfect"))
     
     results = pd.DataFrame(
-        data=np.empty(shape=(nseeds, ndim)),
+        data=np.empty(shape=(nseeds, 2)),
         columns=["expression", "losses"],
         dtype="object",
     )
@@ -227,8 +223,8 @@ def run_single_view(name, nseeds, settings):
     all_examples = [x for x in os.listdir(path) if "csv" in x]
 
     for example in range(len(all_examples)):
+        print(f"Example {example} starting :")
         run_mvsr(name, nseeds, settings, use_single_view=example)
-        print(f"Example {example} Done !")
 
 
 def run_analysis(name, nseeds, settings):
@@ -243,8 +239,8 @@ def run_analysis(name, nseeds, settings):
     for maxL in settings['maxL']:
         setting = settings.copy()
         setting['maxL'] = maxL
+        print("Multiview starting :")
         run_mvsr(name, nseeds, setting)
-        print("Multiview Done !")
         run_single_view(name, nseeds, setting)
 
 
@@ -254,9 +250,9 @@ if __name__ == "__main__":
     
     polynomial_settings = {
         "generations": 1000,
-        "maxL": [40],
+        "maxL": [30],
         "maxD": 10,
-        "OperationSet": None,
+        "OperationSet": Operon.NodeType.Square,
     }
 
     run_analysis("polynomial", nseeds, polynomial_settings)

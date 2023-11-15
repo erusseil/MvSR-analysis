@@ -18,10 +18,11 @@ def MultiViewSR(
     use_single_view=None,
 ):
     all_examples = [x for x in os.listdir(path) if "csv" in x]
+    all_examples = sorted(all_examples)
 
-    #if use_single_view is not None:
-    #    if use_single_view >= len(all_examples):
-    #        raise ValueError("Example asked do not exist")
+    if use_single_view is not None:
+        if use_single_view >= len(all_examples):
+            raise ValueError("Example asked do not exist")
 
     n_sets = len(all_examples)
     problems = []
