@@ -89,27 +89,30 @@ def generate_data(func, name, Xs, params, noises, npoints=25):
 
 
 if __name__ == "__main__":
-    noises = [0.05]  # , .1, .5
+    noises = [0.05, .1]  # 
 
 
     # Generate polynomial data : 
-    step = 0.1
-    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-0, 1], [-2, -1]]
+    step = 0.2
+    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-2, 2], [-2, 2]]
     
     for lim in Xs_lim:
         Xs.append(np.arange(lim[0], lim[1], step))
     
-    generate_data(func_poly, "polynomial", Xs, [[-2, 2, 0],[2, 0, -2],[2, 2, 2],[-2, -2, -2]], noises)
+    generate_data(func_poly, "polynomial", Xs, [[2, -2, 0],[0, 2, -2],[0, 0, 2],[0, 2, 0]], noises)
 
     # Generate gaussian data :
-    step = 0.1
-    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-2, .5], [-.5, 2]]
+    steps = 0.2
+    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-2, 0], [0, 2]]
     
-    for lim in Xs_lim:
-        Xs.append(np.arange(lim[0], lim[1], step))
+    for idx, lim in enumerate(Xs_lim):
+        if (idx==2) | (idx==3):
+            uno = np.arange(lim[0], lim[1], step)
+            Xs.append(np.sort(np.concatenate([uno, uno])))
+        else:
+            Xs.append(np.arange(lim[0], lim[1], step))
         
-    generate_data(func_gaussian, "gaussian", Xs, [[0, 2, 2], [2, 0, .5], [.5, .5, .5], [2, -.5, .5]], noises)
-
+    generate_data(func_gaussian, "gaussian", Xs, [[0, 0, 2],[2, 2, 2],[2, 0, .5],[2, 0, .5]], noises)
 
     #generate_data(func_poly, "friedman1", [[0, 2, 2], [2, 0, 2], [2, 2, 0]], noises)
     #generate_data(func_gaussian, "friedman2", [[2, 0.5], [0.5, 2], [0, 4]], noises)
