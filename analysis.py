@@ -11,63 +11,42 @@ import time
 import sympy as sp
 import string
 import re
+from sympy import symbols, lambdify
+from iminuit import Minuit
+from iminuit.cost import LeastSquares
 
 
-def single_refit(model_path, example_path, outputs, gauss=' --distribution gaussian',\
-                 restart=' --restart', simplify=' --simplify'):
+def MSE(y, ypred):
+    return np.square(np.subtract(y,ypred)).mean()
+
     
-    stream = os.popen('srtree-opt -f operon -i {0} -d {1} --hasheader --niter 100{2}{3}{4}'.format(model_path, example_path, gauss, restart, simplify))
-    outputs.append(stream.read())
-    no_perfect_yet = round(find_sse(outputs[-1]), 3) != 0
-    return outputs, no_perfect_yet
-
-def refit_solution(expression, name, example, noise, maxL):
+def refit_solution(func, path, initial_guess):
     
-    example_path = f"toy_data/{name}/perfect/{example}"
-    model_path = f"toy_results/{name}/{noise}/max{maxL}/operon_{example[:-4]}.models"
+    data = pd.read_csv(path)
+    npoints = len(data)
     
-    npoints = len(pd.read_csv(example_path))
-    
-    with open(model_path, 'w') as f:
-        f.write(expression)
-
-    outputs = []
-    no_perfect_yet = True
-
-    # All options on
-    outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, restart='')
-    # All without some options but with restart !
-    if no_perfect_yet:
-        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', restart='')
-    if no_perfect_yet:
-        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='', restart='')
-    if no_perfect_yet:
-        outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, gauss='', simplify='', restart='')
-
-    for _ in range(10):
-        if no_perfect_yet:
-            outputs, no_perfect_yet = single_refit(model_path, example_path, outputs, simplify='', gauss='')
-
-                
-    errors = np.array([find_sse(i) for i in outputs])
-    errors = errors[errors==errors]
-    if len(errors) != 0:
-        output = outputs[np.argmin(errors[errors==errors])]
-    else: 
+    if npoints<len(initial_guess):
         return np.nan
-
-    if output=='':
-        print(expression, 'is weird')
         
-    os.remove(model_path)
-    return round(find_sse(output)/npoints, 3)
+    X, y = data['Xaxis'].values.flatten(), data.yaxis.values
+    
+    least_squares = LeastSquares(X, y, .1, func)
+    fit = Minuit(least_squares, **initial_guess)
+    fit.migrad()
+    y_pred = func(X, *fit.values)
+    MSE_mvsr = MSE(y, y_pred)
+    return round(MSE_mvsr, 3)
+
 
 def convert_string_to_func(SR_str):
     alphabet = list(string.ascii_uppercase)
     parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
     parameters_dict = {}
     function_str = str(sp.N(sp.sympify(SR_str), 50))
-    all_floats = re.findall("\d+\.\d+", function_str)
+    # Remove scientific notation
+    function_str = re.sub("e\d+", '', re.sub("e-\d+", '', function_str))
+    
+    all_floats = re.findall("\d+\.\d+", function_str) + ['0']
 
     if len(all_floats)>len(parameter_names):
         print('WARNING WAY TOO BIG FUNCTIONS')
@@ -76,8 +55,11 @@ def convert_string_to_func(SR_str):
     for idx, one_float in enumerate(all_floats):
         function_str = function_str.replace(one_float, parameter_names[idx], 1)
         parameters_dict[parameter_names[idx]] = float(one_float)
-        
-    return function_str
+
+    xs = symbols(['X1', *parameter_names[:len(all_floats)]])
+    func = lambdify(xs, function_str, ["numpy", {'exp':np.exp, 'Log':np.log}])
+    return func, function_str, parameters_dict
+
 
 def replace_wrong_symbols(expression):
     expression = expression.replace("^", "**")
@@ -182,8 +164,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
     """
 
     noises = os.listdir(f"toy_data/{name}")
-    examples = sorted(os.listdir(f"toy_data/{name}/perfect"))
-    
+    examples = sorted([x for x in os.listdir(f"toy_data/{name}/perfect") if "csv" in x])
     results = pd.DataFrame(
         data=np.empty(shape=(nseeds, 2)),
         columns=["expression", "losses"],
@@ -200,14 +181,23 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
                 **settings,
             )
 
-            mse_refit = []
-            for example in examples:
-                before = time.time()
-                refit = refit_solution(result[0], name, example, noise, settings['maxL'])
-                duration = time.time()-before
-                mse_refit.append(refit)
+            conversion = convert_string_to_func(result[0])
 
-            results.iloc[seed] = [convert_string_to_func(result[0]), mse_refit]
+            # Case where the expression was too big to be fitted realistically
+            if not conversion[1]:
+                results.iloc[seed] = [conversion[0], np.nan]
+
+            else:
+                func, func_str, initial_guess = convert_string_to_func(result[0])
+                mse_refit = []
+                
+                for example in examples:
+                    perfect_path = f"toy_data/{name}/perfect/{example}"
+                    refit = refit_solution(func, perfect_path, initial_guess)
+                    mse_refit.append(refit)
+    
+                results.iloc[seed] = [func_str, mse_refit]
+
 
         if use_single_view is not None:
             results.to_csv(
@@ -220,7 +210,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
 
 def run_single_view(name, nseeds, settings):
     path = f"toy_data/{name}/perfect/"
-    all_examples = [x for x in os.listdir(path) if "csv" in x]
+    all_examples = sorted([x for x in os.listdir(path) if "csv" in x])
 
     for example in range(len(all_examples)):
         print(f"Example {example} starting :")
@@ -246,13 +236,22 @@ def run_analysis(name, nseeds, settings):
 
 if __name__ == "__main__":
 
-    nseeds = 10
+    nseeds = 100
     
     polynomial_settings = {
         "generations": 1000,
-        "maxL": [30],
-        "maxD": 10,
+        "maxL": [20],
+        "maxD": 5,
         "OperationSet": Operon.NodeType.Square,
     }
 
     run_analysis("polynomial", nseeds, polynomial_settings)
+    '''
+    gaussian_settings = {
+        "generations": 1000,
+        "maxL": [5],
+        "maxD": 5,
+        "OperationSet": Operon.NodeType.Exp,
+    }
+    run_analysis("gaussian", nseeds, gaussian_settings)
+    '''
