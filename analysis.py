@@ -6,30 +6,45 @@ import shutil
 import json
 import pandas as pd
 import pyoperon as Operon
-import sympy as sp
 import time
 import sympy as sp
+from sympy import sin, exp, sqrt
 import string
 import re
 from sympy import symbols, lambdify
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 
-
 def MSE(y, ypred):
+    """
+    Compute mean square error
+    
+    Parameters
+    ---------
+    y: array
+        True answer
+    ypred: array
+        Predicted answers
+    Returns
+    -------
+    float
+        Mean square error metric
+    
+    """
     return np.square(np.subtract(y,ypred)).mean()
 
     
 def refit_solution(func, path, initial_guess):
-    
+
     data = pd.read_csv(path)
     npoints = len(data)
     
     if npoints<len(initial_guess):
         return np.nan
-        
-    X, y = data['Xaxis'].values.flatten(), data.yaxis.values
-    
+
+    X, y = data.iloc[:, :-1].values, data.yaxis.values
+    X = X.T
+
     least_squares = LeastSquares(X, y, .1, func)
     fit = Minuit(least_squares, **initial_guess)
     fit.migrad()
@@ -37,8 +52,60 @@ def refit_solution(func, path, initial_guess):
     MSE_mvsr = MSE(y, y_pred)
     return round(MSE_mvsr, 3)
 
+def convert_string_to_func(SR_str, n_variables):
+    alphabet = list(string.ascii_uppercase)
+    parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
+    parameters_dict = {}
 
-def convert_string_to_func(SR_str):
+
+    function_str = str(sp.N(sp.sympify(SR_str), 50))
+
+    floatzoo = 99.9
+    # Zoo detection :
+    while "zoo" in function_str:
+        function_str= function_str.replace("zoo", str(floatzoo), 1)
+        floatzoo += 1
+        
+    # Remove scientific notation
+    function_str = re.sub("e\d+", '',re.sub("e\+\d+", '', re.sub("e-\d+", '', function_str)))
+    # Make sure sqrt are not mistaken for parameters
+    function_str = function_str.replace("**0.5", '**sqrt')
+
+    all_floats = re.findall("\d+\.\d+", function_str) + ['0']
+
+    if len(all_floats)>len(parameter_names):
+        print('WARNING WAY TOO BIG FUNCTIONS')
+        return function_str, False
+
+    n_parameters = 0
+    for idx, one_float in enumerate(all_floats):
+        if one_float in function_str:
+            n_parameters += 1
+            function_str = function_str.replace(one_float, parameter_names[idx], 1)
+            parameters_dict[parameter_names[idx]] = float(one_float)
+
+    # Revert it once we found all floats
+    function_str = function_str.replace('**sqrt', "**0.5")
+    used_params = parameter_names[:n_parameters]
+
+    X = sp.IndexedBase('X')
+    param_symbols = {k:sp.Symbol(k) for k in used_params}
+    param_symbols['X'] = X
+
+    tempo_function_str = function_str
+    for i in range(n_variables):
+        tempo_function_str = tempo_function_str.replace(f'X{i+1}', f'X[{i}]')
+
+    try:
+        func = sp.lambdify(["X"] + used_params, eval(tempo_function_str, globals(), param_symbols), modules=["numpy", {'exp':np.exp, 'Log':np.log, 'sin':np.sin}])
+    except:
+        print("Original:", SR_str)
+        print("After:", function_str)
+    
+    return func, function_str, parameters_dict
+
+
+def convert_string_to_funcOLD(SR_str):
     alphabet = list(string.ascii_uppercase)
     parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
     parameters_dict = {}
@@ -165,6 +232,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
 
     noises = os.listdir(f"toy_data/{name}")
     examples = sorted([x for x in os.listdir(f"toy_data/{name}/perfect") if "csv" in x])
+    n_variables = np.shape(pd.read_csv(f"toy_data/{name}/perfect/{examples[0]}"))[1]-1
     results = pd.DataFrame(
         data=np.empty(shape=(nseeds, 2)),
         columns=["expression", "losses"],
@@ -181,16 +249,15 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
                 **settings,
             )
 
-            conversion = convert_string_to_func(result[0])
+            conversion = convert_string_to_func(result[0], n_variables)
 
             # Case where the expression was too big to be fitted realistically
             if not conversion[1]:
                 results.iloc[seed] = [conversion[0], np.nan]
 
             else:
-                func, func_str, initial_guess = convert_string_to_func(result[0])
+                func, func_str, initial_guess = conversion
                 mse_refit = []
-                
                 for example in examples:
                     perfect_path = f"toy_data/{name}/perfect/{example}"
                     refit = refit_solution(func, perfect_path, initial_guess)
@@ -237,21 +304,16 @@ def run_analysis(name, nseeds, settings):
 if __name__ == "__main__":
 
     nseeds = 100
+    common_operation_set = Operon.NodeType.Square | Operon.NodeType.Exp | Operon.NodeType.Sin | Operon.NodeType.Sqrt
+    common_setting = {
+        "generations": 1000,
+        "maxL": [20, 25], #,5, 10, 15 
+        "maxD": 5,
+        "OperationSet": common_operation_set, 
+    }
     
-    polynomial_settings = {
-        "generations": 1000,
-        "maxL": [20],
-        "maxD": 5,
-        "OperationSet": Operon.NodeType.Square,
-    }
+    run_analysis("polynomial", nseeds, common_setting)
+    #run_analysis("gaussian", nseeds, common_setting)
+    #run_analysis("friedman1", nseeds, common_setting)
+    #run_analysis("friedman2", nseeds, common_setting)
 
-    run_analysis("polynomial", nseeds, polynomial_settings)
-    '''
-    gaussian_settings = {
-        "generations": 1000,
-        "maxL": [5],
-        "maxD": 5,
-        "OperationSet": Operon.NodeType.Exp,
-    }
-    run_analysis("gaussian", nseeds, gaussian_settings)
-    '''

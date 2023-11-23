@@ -6,6 +6,9 @@ import random, time, sys, os, json
 from scipy import stats
 import sympy as sp
 
+import warnings
+warnings.filterwarnings("ignore")
+
 def MultiViewSR(
     path,
     minL=1,
