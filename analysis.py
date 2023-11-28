@@ -81,8 +81,14 @@ def convert_string_to_func(SR_str, n_variables):
     for idx, one_float in enumerate(all_floats):
         if one_float in function_str:
             n_parameters += 1
-            function_str = function_str.replace(one_float, parameter_names[idx], 1)
-            parameters_dict[parameter_names[idx]] = float(one_float)
+            if one_float == '0':
+                for zzz in [i for i, letter in enumerate(function_str) if letter == '0']:
+                    if not function_str[zzz-1].isnumeric():
+                        function_str = function_str.replace(one_float, parameter_names[idx], 1)
+                        parameters_dict[parameter_names[idx]] = float(one_float) 
+            else:
+                function_str = function_str.replace(one_float, parameter_names[idx], 1)
+                parameters_dict[parameter_names[idx]] = float(one_float)
 
     # Revert it once we found all floats
     function_str = function_str.replace('**sqrt', "**0.5")
@@ -304,16 +310,21 @@ def run_analysis(name, nseeds, settings):
 if __name__ == "__main__":
 
     nseeds = 100
-    common_operation_set = Operon.NodeType.Square | Operon.NodeType.Exp | Operon.NodeType.Sin | Operon.NodeType.Sqrt
+    common_operation_set = Operon.NodeType.Square | Operon.NodeType.Exp | Operon.NodeType.Sqrt
+    sin_operation_set = common_operation_set | Operon.NodeType.Sin
+    
     common_setting = {
         "generations": 1000,
-        "maxL": [20, 25], #,5, 10, 15 
+        "maxL": [5, 10, 15], # ,20, 25 
         "maxD": 5,
-        "OperationSet": common_operation_set, 
+        "OperationSet": sin_operation_set, 
     }
-    
-    run_analysis("polynomial", nseeds, common_setting)
-    #run_analysis("gaussian", nseeds, common_setting)
-    #run_analysis("friedman1", nseeds, common_setting)
+
     #run_analysis("friedman2", nseeds, common_setting)
+    #run_analysis("gaussian", nseeds, common_setting)
+    #run_analysis("polynomial", nseeds, common_setting)
+    #run_analysis("f1", nseeds, common_setting)
+    
+    run_analysis("friedman1", nseeds, common_setting)
+    #run_analysis("f7", nseeds, common_setting)
 
