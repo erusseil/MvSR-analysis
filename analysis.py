@@ -14,6 +14,7 @@ import re
 from sympy import symbols, lambdify
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
+import argparse
 
 def MSE(y, ypred):
     """
@@ -34,7 +35,7 @@ def MSE(y, ypred):
     return np.square(np.subtract(y,ypred)).mean()
 
     
-def refit_solution(func, path, initial_guess):
+def refit_solution(func, path, initial_guess, original, after):
 
     data = pd.read_csv(path)
     npoints = len(data)
@@ -46,18 +47,26 @@ def refit_solution(func, path, initial_guess):
     X = X.T
 
     least_squares = LeastSquares(X, y, .1, func)
+
+    try:
+        fit = Minuit(least_squares, **initial_guess)
+        fit.migrad()
+    except:
+        print("Original:", original)
+        print("After:", after)
+        
     fit = Minuit(least_squares, **initial_guess)
     fit.migrad()
     y_pred = func(X, *fit.values)
     MSE_mvsr = MSE(y, y_pred)
-    return round(MSE_mvsr, 3)
+    return MSE_mvsr
 
 def convert_string_to_func(SR_str, n_variables):
     alphabet = list(string.ascii_uppercase)
     parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
     parameters_dict = {}
 
-
+    # Operon internally does A*f(x)+B, here we make sure that A and B are explicit
     function_str = str(sp.N(sp.sympify(SR_str), 50))
 
     floatzoo = 99.9
@@ -65,11 +74,20 @@ def convert_string_to_func(SR_str, n_variables):
     while "zoo" in function_str:
         function_str= function_str.replace("zoo", str(floatzoo), 1)
         floatzoo += 1
+
+    if "I" in function_str:
+        function_str = function_str.replace("**I", '**1')
+        function_str = function_str.replace("*I", '*1')
+        function_str = function_str.replace("/I", '/1')
+        function_str = function_str.replace("+ I", '+ 0')
+        function_str = function_str.replace("- I", '- 0')
+        function_str = str(sp.N(sp.sympify(function_str), 50))
         
     # Remove scientific notation
     function_str = re.sub("e\d+", '',re.sub("e\+\d+", '', re.sub("e-\d+", '', function_str)))
-    # Make sure sqrt are not mistaken for parameters
-    function_str = function_str.replace("**0.5", '**sqrt')
+    # Make sure sqrt are not mistaken for parameters up to 5 sqrt intricated
+    for i, code in enumerate(['one', 'two', 'three', 'four', 'five']):
+        function_str = function_str.replace(f"**{str(0.5**(i+1))}", f'**sqrt{code}')
 
     all_floats = re.findall("\d+\.\d+", function_str) + ['0']
 
@@ -80,18 +98,21 @@ def convert_string_to_func(SR_str, n_variables):
     n_parameters = 0
     for idx, one_float in enumerate(all_floats):
         if one_float in function_str:
-            n_parameters += 1
             if one_float == '0':
                 for zzz in [i for i, letter in enumerate(function_str) if letter == '0']:
                     if not function_str[zzz-1].isnumeric():
+                        n_parameters += 1
                         function_str = function_str.replace(one_float, parameter_names[idx], 1)
                         parameters_dict[parameter_names[idx]] = float(one_float) 
             else:
+                n_parameters += 1
                 function_str = function_str.replace(one_float, parameter_names[idx], 1)
                 parameters_dict[parameter_names[idx]] = float(one_float)
 
-    # Revert it once we found all floats
-    function_str = function_str.replace('**sqrt', "**0.5")
+    #Revert sqrt temporariry protection
+    for i, code in enumerate(['one', 'two', 'three', 'four', 'five']):
+        function_str = function_str.replace(f'**sqrt{code}', f"**{str(0.5**(i+1))}")
+            
     used_params = parameter_names[:n_parameters]
 
     X = sp.IndexedBase('X')
@@ -108,29 +129,6 @@ def convert_string_to_func(SR_str, n_variables):
         print("Original:", SR_str)
         print("After:", function_str)
     
-    return func, function_str, parameters_dict
-
-
-def convert_string_to_funcOLD(SR_str):
-    alphabet = list(string.ascii_uppercase)
-    parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
-    parameters_dict = {}
-    function_str = str(sp.N(sp.sympify(SR_str), 50))
-    # Remove scientific notation
-    function_str = re.sub("e\d+", '', re.sub("e-\d+", '', function_str))
-    
-    all_floats = re.findall("\d+\.\d+", function_str) + ['0']
-
-    if len(all_floats)>len(parameter_names):
-        print('WARNING WAY TOO BIG FUNCTIONS')
-        return function_str, False
-        
-    for idx, one_float in enumerate(all_floats):
-        function_str = function_str.replace(one_float, parameter_names[idx], 1)
-        parameters_dict[parameter_names[idx]] = float(one_float)
-
-    xs = symbols(['X1', *parameter_names[:len(all_floats)]])
-    func = lambdify(xs, function_str, ["numpy", {'exp':np.exp, 'Log':np.log}])
     return func, function_str, parameters_dict
 
 
@@ -266,7 +264,7 @@ def run_mvsr(name, nseeds, settings, use_single_view=None):
                 mse_refit = []
                 for example in examples:
                     perfect_path = f"toy_data/{name}/perfect/{example}"
-                    refit = refit_solution(func, perfect_path, initial_guess)
+                    refit = refit_solution(func, perfect_path, initial_guess, result[0], func_str)
                     mse_refit.append(refit)
     
                 results.iloc[seed] = [func_str, mse_refit]
@@ -286,7 +284,6 @@ def run_single_view(name, nseeds, settings):
     all_examples = sorted([x for x in os.listdir(path) if "csv" in x])
 
     for example in range(len(all_examples)):
-        print(f"Example {example} starting :")
         run_mvsr(name, nseeds, settings, use_single_view=example)
 
 
@@ -302,29 +299,33 @@ def run_analysis(name, nseeds, settings):
     for maxL in settings['maxL']:
         setting = settings.copy()
         setting['maxL'] = maxL
-        print("Multiview starting :")
         run_mvsr(name, nseeds, setting)
         run_single_view(name, nseeds, setting)
 
 
 if __name__ == "__main__":
 
-    nseeds = 100
+
+    arg_parser=argparse.ArgumentParser()
+    arg_parser.add_argument("--maxL", nargs="*", type=int, default=[5, 10, 15, 20, 25], help='maxL list')
+    arg_parser.add_argument('--opset', default='common', type=str, help='common or sin')
+    arg_parser.add_argument('--function', required=True, type=str, help='Function to extract')
+    arg_parser.add_argument('--nseeds', default=100, type=int, help='Number of seeds')
+    args = arg_parser.parse_args()
+
     common_operation_set = Operon.NodeType.Square | Operon.NodeType.Exp | Operon.NodeType.Sqrt
-    sin_operation_set = common_operation_set | Operon.NodeType.Sin
+
+    if args.opset == 'common':
+        operation_set = common_operation_set
+    elif args.opset == 'sin':
+        operation_set = common_operation_set | Operon.NodeType.Sin
     
     common_setting = {
         "generations": 1000,
-        "maxL": [5, 10, 15], # ,20, 25 
+        "maxL": args.maxL,
         "maxD": 5,
-        "OperationSet": sin_operation_set, 
+        "OperationSet": operation_set, 
     }
 
-    #run_analysis("friedman2", nseeds, common_setting)
-    #run_analysis("gaussian", nseeds, common_setting)
-    #run_analysis("polynomial", nseeds, common_setting)
-    #run_analysis("f1", nseeds, common_setting)
+    run_analysis(args.function, args.nseeds, common_setting)
     
-    run_analysis("friedman1", nseeds, common_setting)
-    #run_analysis("f7", nseeds, common_setting)
-

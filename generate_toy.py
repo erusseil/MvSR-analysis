@@ -10,13 +10,8 @@ import shutil
 global_rng = default_rng(seed=0)
 
 
-def func_poly(X, A, B, C):
-    return A + B * X + C * X**2
-
-def func_gaussian(X, A, mu, sig):
-    return (
-        A / (np.sqrt(2.0 * np.pi) * sig) * np.exp(-np.power((X - mu) / sig, 2.0) / 2)
-    )
+def func_poly3(X, A, B, C, D):
+    return A + B * X + C * X**2 + D * X**3
 
 def func_fried1(X, A, B, C, D):
     # Original functional form comes from here :
@@ -28,8 +23,9 @@ def func_fried2(X, A, B, C, D):
     # Original functional form comes from here :
     # https://scikit-learn.org/stable/modules/generated/sklearn.datasets.make_friedman2.html
     # The function was modified to incorporate 4 free parameters
-    return A * (B * X[:, 0] ** 2 + C + (D * X[:, 1] * X[:, 2]  - 1 / (X[:, 1] * X[:, 3])) ** 2) ** 0.5
-    
+    return (A * X[:, 0] ** 2 + (B * X[:, 1] * X[:, 2]  - C / (D * X[:, 1] * X[:, 3] + 1)) ** 2) ** 0.5 
+
+
 def gaussian_noise(y, rng, noise_ratio):
     sigma = np.std(y) * np.sqrt(noise_ratio / (1.0 - noise_ratio))
     return rng.normal(loc=0.0, scale=sigma, size=len(y))
@@ -54,13 +50,13 @@ def create_folders(name, noises):
             os.makedirs(f"toy_data/{name}/noisy_{noise}")
 
 
-def generate_data(func, name, Xs, params, noises):
+def generate_data(func, name, Xs, nXs, params, noises, oversample=False):
 
-    if len(np.shape(Xs)) == 2:
+    if nXs == 1:
         header = ["Xaxis0", "yaxis"]
     else:
         header = []
-        for i in range(np.shape(Xs)[1]):
+        for i in range(nXs):
             header.append(f"Xaxis{i}")
         header.append("yaxis")
     
@@ -69,7 +65,12 @@ def generate_data(func, name, Xs, params, noises):
     for idx, param in enumerate(params):
         x = Xs[idx]
         y = func(x.T, *param)
+        y = 10 * y/(max([abs(k) for k in y]))
 
+        if type(oversample)==list:
+            x = np.concatenate([list(x) for _k in range(oversample[idx])])
+            y = np.concatenate([list(y) for _k in range(oversample[idx])])
+            
         if len(np.shape(x.T)) == 1:
             example = np.vstack((x.T, y)).T
         elif len(np.shape(x.T)) == 2:
@@ -87,6 +88,9 @@ def generate_data(func, name, Xs, params, noises):
 
         for noise in noises:
             y_noisy = y + gaussian_noise(y, global_rng, noise)
+
+            if type(oversample)==list:
+                y_noisy = np.concatenate([list(y_noisy[:int(len(y)/oversample[idx])]) for _k in range(oversample[idx])])
             example = np.vstack((x, y_noisy)).T
 
             with open(
@@ -101,52 +105,56 @@ def generate_data(func, name, Xs, params, noises):
 
 
 if __name__ == "__main__":
-    noises = [0.05, .1]  # 
+    noises = [0.033, 0.066, 0.1]  # 
 
-
-    # Generate polynomial data : 
+    # Generate polynomial data with parameters to 0 : 
     step = 0.2
     Xs, Xs_lim = [], [-2, 2]
     
     for i in range(4):
         Xs.append(np.arange(Xs_lim[0], Xs_lim[1], step))
     
-    generate_data(func_poly, "polynomial", Xs, [[2, -2, 0],[0, 2, -2],[0, 0, 2],[0, 2, 0]], noises)
+    generate_data(func_poly3, "polynomial0", Xs, 1, [[2, 2, 0, 0],
+                                                  [0, 2, 2, 0],
+                                                  [0, 0, 2, 2],
+                                                  [2, 0, 0, 2]], noises)
 
-    # Generate gaussian data :
-    steps = 0.2
-    Xs, Xs_lim = [], [[-2, 2], [-2, 2], [-2, 0], [0, 2]]
+    #____________________________________________________________________
+    # Generate polynomial data with partial view : 
+    step = 0.05
+    Xs, Xs_lim = [], [[-2, -1],[-1, 0],[0, 1],[1, 2]]
     
     for idx, lim in enumerate(Xs_lim):
-        if (idx==2) | (idx==3):
-            uno = np.arange(lim[0], lim[1], step)
-            Xs.append(np.sort(np.concatenate([uno, uno])))
-        else:
-            Xs.append(np.arange(lim[0], lim[1], step))
+        Xs.append(np.arange(lim[0], lim[1], step))
+    
+    generate_data(func_poly3, "polynomial_partial", Xs, 1, [[2, -2, 2, 2],
+                      [2, -2, 2, 2],
+                      [2, -2, 2, 2],
+                      [2, -2, 2, 2]], noises)
 
-    generate_data(func_gaussian, "gaussian", Xs, [[0, 0, 2],[2, 0, 2],[2, 0.5, .5],[2, 0.5, .5]], noises)
-
+    #____________________________________________________________________
     # Generate friedman1 data :
     npoints = 100
-    Xs = []
-
+    Xs, nXs = [], 5
+    
     #Loop through each example
     for _ in range(4):
         loop = [] 
         #Loop through each X
-        for i in range(5):
+        for i in range(nXs):
             loop.append(np.random.random_sample(npoints))
         Xs.append(np.array(loop))
             
-    generate_data(func_fried1, "friedman1", Xs, [[2, 2, 2, 0],
-                                                  [2, 2, 0, 2],
-                                                  [2, 0, 2, 2],
-                                                  [0, 2, 2, 2]], noises)
-    
+    generate_data(func_fried1, "friedman1", Xs, nXs, [[2, 2, 0, 0],
+                                                  [0, 2, 2, 0],
+                                                  [0, 0, 2, 2],
+                                                  [2, 0, 0, 2]], noises)
+
+    #____________________________________________________________________
     # Generate friedman2 data :
     npoints = 100
-    Xs = []
-
+    Xs, nXs = [], 4
+    
     #Loop through each example
     for _ in range(4):
         loop = [] 
@@ -156,12 +164,10 @@ if __name__ == "__main__":
         loop.append(np.random.uniform(low=1, high=11, size=npoints))
         Xs.append(np.array(loop))
             
-    generate_data(func_fried2, "friedman2", Xs, [[2, 2, 2, 0],
-                                                  [2, 2, 0, 2],
-                                                  [2, 0, 2, 2],
-                                                  [0, 2, 2, 2]], noises)
-    
+    generate_data(func_fried2, "friedman2", Xs, nXs, [[2, 2, 0, 0],
+                                                  [0, 2, 2, 0],
+                                                  [0, 0, 2, 2],
+                                                  [2, 0, 0, 2]], noises)
 
 
-
-
+   

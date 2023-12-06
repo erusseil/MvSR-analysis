@@ -185,6 +185,10 @@ def MultiViewSR(
     gp.Run(rng, threads=1)
     best = gp.BestModel
     agg_model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
+    # Internally operon uses A*f(x)+B and fits A and B. We make sure that A and B appears explicity in the solutions
+    # to later be replaces by parameters
+    agg_model_string = "1.00001*("+ agg_model_string + ")+0.00001"
+
 
     scores = []
 
@@ -200,8 +204,7 @@ def MultiViewSR(
         if verbose:
             print(e.CallCount, e.ResidualEvaluations, e.JacobianEvaluations)
             print(f"Eval. {i}: ", e(rng, best))
-            model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
-            print(f"{sp.N(model_string, 4)}\n")
+            print(f"{sp.N(agg_model_string, 4)}\n")
 
 
     return agg_model_string, scores
