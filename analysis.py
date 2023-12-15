@@ -8,13 +8,78 @@ import pandas as pd
 import pyoperon as Operon
 import time
 import sympy as sp
-from sympy import sin, exp, sqrt
+from sympy import sin, exp, sqrt, log, Abs
 import string
 import re
 from sympy import symbols, lambdify
 from iminuit import Minuit
 from iminuit.cost import LeastSquares
 import argparse
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+def refit_and_plot(folder, func, func_str, initial_guess, Xlim, ylim, labels, saveas, error=None, limits=None):
+    
+    smooth = [np.linspace(Xlim[0], Xlim[1], 500).T]
+    color_palette = sns.color_palette("tab10")
+    all_sets = np.sort([x for x in os.listdir(folder) if 'csv' in x])
+
+    fig, axes = plt.subplots(1, 1, figsize=(16,8))
+
+    for idx, file in enumerate(all_sets):
+        df = pd.read_csv(f'{folder}/{file}')
+        X = df.iloc[:, :-1].values.T
+        y = df.yaxis.values
+    
+        least_squares = LeastSquares(X, y, 1, func)
+        fit = Minuit(least_squares, **initial_guess)
+
+        if limits is not None:
+            for k in range(len(limits)):
+                fit.limits[list(initial_guess)[k]] = limits[k]
+                
+        fit.migrad()
+        y_pred = func(X, *fit.values)
+        
+        sx = np.sort(X, axis=0)
+        
+        dic = fit.values.to_dict()
+        display = [f'{x}: {dic.get(x):.2f}' for x in dic]
+        display = ", ".join([str(item) for item in display])
+        
+        if error is None:
+            plt.scatter(X.flatten(), y, label=display, color=color_palette[idx], s=60)
+        else:
+            plt.errorbar(X.flatten(), y, yerr=error[idx], fmt='o', label=display, color=color_palette[idx],\
+                        markersize=8, elinewidth=3)
+
+        plt.plot(smooth[0], func(smooth, *fit.values).flatten(), color=color_palette[idx], alpha=.6, linewidth=3)
+        plt.ylim(ylim[0], ylim[1])
+        plt.xlim(min(smooth[0]), max(smooth[0]))
+
+        title = f"f(X1) = {func_str}".replace("X1", "X")
+        plt.title(title, fontsize=20)
+        plt.xlabel(labels[0], fontsize=18)
+        plt.ylabel(labels[1], fontsize=18)
+
+        for axis in ['top','bottom','left','right']:
+            axes.spines[axis].set_linewidth(2)
+
+        axes.tick_params(width=2,labelsize=17)
+        plt.legend(fontsize=17)
+        plt.savefig(f"plots/{saveas}.png")
+
+def save_2D_example(X, y, path):
+    
+    header = ['Xaxis0', 'yaxis']
+    example = np.vstack((X, y)).T
+
+    with open(path, 'w', encoding='UTF8', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        writer.writerows(example)
+
 
 def MSE(y, ypred):
     """
@@ -62,11 +127,11 @@ def refit_solution(func, path, initial_guess, original, after):
     return MSE_mvsr
 
 def convert_string_to_func(SR_str, n_variables):
+
     alphabet = list(string.ascii_uppercase)
     parameter_names = alphabet + [[k + i for k in alphabet for i in alphabet ]]
     parameters_dict = {}
 
-    # Operon internally does A*f(x)+B, here we make sure that A and B are explicit
     function_str = str(sp.N(sp.sympify(SR_str), 50))
 
     floatzoo = 99.9
@@ -75,6 +140,8 @@ def convert_string_to_func(SR_str, n_variables):
         function_str= function_str.replace("zoo", str(floatzoo), 1)
         floatzoo += 1
 
+    function_str = function_str.replace("re", '')
+    function_str = function_str.replace("im", '')
     if "I" in function_str:
         function_str = function_str.replace("**I", '**1')
         function_str = function_str.replace("*I", '*1')
@@ -124,7 +191,7 @@ def convert_string_to_func(SR_str, n_variables):
         tempo_function_str = tempo_function_str.replace(f'X{i+1}', f'X[{i}]')
 
     try:
-        func = sp.lambdify(["X"] + used_params, eval(tempo_function_str, globals(), param_symbols), modules=["numpy", {'exp':np.exp, 'Log':np.log, 'sin':np.sin}])
+        func = sp.lambdify(["X"] + used_params, eval(tempo_function_str, globals(), param_symbols), modules=["numpy", {'exp':np.exp, 'log':np.log, 'sin':np.sin, 'abs':np.abs}])
     except:
         print("Original:", SR_str)
         print("After:", function_str)

@@ -19,6 +19,7 @@ def MultiViewSR(
     seed=44,
     verbose=True,
     use_single_view=None,
+    explicit_params=True,
 ):
     all_examples = [x for x in os.listdir(path) if "csv" in x]
     all_examples = sorted(all_examples)
@@ -185,9 +186,12 @@ def MultiViewSR(
     gp.Run(rng, threads=1)
     best = gp.BestModel
     agg_model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
-    # Internally operon uses A*f(x)+B and fits A and B. We make sure that A and B appears explicity in the solutions
-    # to later be replaces by parameters
-    agg_model_string = "1.00001*("+ agg_model_string + ")+0.00001"
+
+
+    if explicit_params:
+        # Internally operon uses A*f(x)+B and fits A and B. We make sure that A and B appears explicity in the solutions
+        # to later be replaces by parameters. Not applying can biais the analysis in particular for simple cases
+        agg_model_string = "1.00001*("+ agg_model_string + ")+0.00001"
 
 
     scores = []
@@ -208,3 +212,4 @@ def MultiViewSR(
 
 
     return agg_model_string, scores
+
