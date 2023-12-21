@@ -68,7 +68,7 @@ def refit_and_plot(folder, func, func_str, initial_guess, Xlim, ylim, labels, sa
 
         axes.tick_params(width=2,labelsize=17)
         plt.legend(fontsize=17)
-        plt.savefig(f"plots/{saveas}.png")
+        plt.savefig(f"plots/{saveas}.png", bbox_inches='tight')
 
 def save_2D_example(X, y, path):
     
@@ -197,54 +197,6 @@ def convert_string_to_func(SR_str, n_variables):
         print("After:", function_str)
     
     return func, function_str, parameters_dict
-
-
-def replace_wrong_symbols(expression):
-    expression = expression.replace("^", "**")
-    return expression
-    
-def find_expression(output):
-    """
-    Reads output of srtree-opt refiter and finds the refited expression.
-
-    Paramters
-    ---------
-    output: str
-        String outputed by srtree-opt refiter
-
-    Returns
-    -------
-    str:
-        Refited mathematical expression as outputed by srtree-opt
-    """
-    start1 = output.find('\n0,') + 3
-    start2 = output.find(',', start1) + 1
-    stop = output.find(',', start2)
-    return output[start2:stop]
-
-
-def find_sse(output):
-    """
-    Reads output of srtree-opt refiter and finds sse error
-
-    Paramters
-    ---------
-    output: str
-        String outputed by srtree-opt refiter
-
-    Returns
-    -------
-    float:
-        Sum of square error as outputed by srtree-opt
-    """
-    start = output.find('\n0,') + 3
-
-    for i in range(9):
-        start = output.find(',', start) + 1
-    
-    stop = output.find(',', start)
-
-    return float(output[start:stop])
 
 
 def create_folders(name, noises, settings):
