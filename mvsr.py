@@ -7,7 +7,9 @@ from scipy import stats
 import sympy as sp
 
 import warnings
+
 warnings.filterwarnings("ignore")
+
 
 def MultiViewSR(
     path,
@@ -129,7 +131,7 @@ def MultiViewSR(
 
         evaluator_i.Optimizer = optimizers[-1]
 
-        #evaluator_i.LocalOptimizationIterations = 100
+        # evaluator_i.LocalOptimizationIterations = 100
         evaluators.append(evaluator_i)
 
         if use_single_view is None:
@@ -162,13 +164,13 @@ def MultiViewSR(
         seed=seed,
         time_limit=86400,
     )
-    
+
     # define how the offspring are merged back into the population - here we replace the worst parents with the best offspring
     reinserter = Operon.ReplaceWorstReinserter(objective_index=0)
     gp = Operon.GeneticProgrammingAlgorithm(
         problems[0], config, tree_initializer, coeff_initializer, generator, reinserter
     )
-    
+
     # report some progress
     gen = 0
     max_ticks = 50
@@ -187,12 +189,10 @@ def MultiViewSR(
     best = gp.BestModel
     agg_model_string = Operon.InfixFormatter.Format(best.Genotype, ds, 15)
 
-
     if explicit_params:
         # Internally operon uses A*f(x)+B and fits A and B. We make sure that A and B appears explicity in the solutions
         # to later be replaces by parameters. Not applying can biais the analysis in particular for simple cases
-        agg_model_string = "1.00001*("+ agg_model_string + ")+0.00001"
-
+        agg_model_string = "1.00001*(" + agg_model_string + ")+0.00001"
 
     scores = []
 
@@ -210,6 +210,4 @@ def MultiViewSR(
             print(f"Eval. {i}: ", e(rng, best))
             print(f"{sp.N(agg_model_string, 4)}\n")
 
-
     return agg_model_string, scores
-
