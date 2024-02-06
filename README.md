@@ -13,3 +13,5 @@ And line 1836 becomes
 ```bash
  x = self._masked.T[: self._ndim]
 ```
+## Second requirement
+The pyoperon version used includes some adaptations to make MvSR possible. Therefore the specific branch: https://github.com/heal-research/pyoperon/tree/cpp17 should be installed.
