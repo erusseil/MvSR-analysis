@@ -1,4 +1,8 @@
 This Git-Hub presents the code used to generate results from the "Multi-View Symbolic Regression" paper.
+The artificial benchmark dataset can be generated using the generate_data.py file. The real datasets from chemistry, finance and astrophysics are available in the real_data folder.  
+For each one we provide a notebook with the specific setups used to generate the parametric functions presented in the paper.
+
+
 In addition to the requirement.txt file it requires two additional setup.
 
 ## First requirement
