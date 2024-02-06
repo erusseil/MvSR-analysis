@@ -4,12 +4,13 @@ This repository contains the code used to generate results shown in [Russeil *et
 
 Files:  
 
-- `analysis.py`: 
+- `mvsr.py`: MvSR basic implementation.
 - `generate_data.py`: generates the artificial benchmark dataset
-- `mvsr.py`:
-- `plots.py`:
-- `results.py:
-- `run_all.sh`:
+- `analysis.py`: Run SR/MvSR on artificial benchmark. Allow to refit and evaluate.
+- `run_all.sh`: Run the main analysis for every setup presented in the paper.
+- `results.py`: Read results and aggregate them into a table.
+- `plots.py`: Generate plots from the aggregated table.
+
 
 Folders:  
 
