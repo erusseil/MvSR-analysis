@@ -14,7 +14,7 @@ Files:
 
 Folders:  
 
-- `read_data` : The real datasets from chemistry, finance and astrophysics
+- `real_data` : The real datasets from chemistry, finance and astrophysics
 - For each data set, we provide a notebook with the specific setups used to generate the parametric functions presented in the paper.
 
 To run the code, in addition to the dependencies listed in the  `requirement.txt` file, it requires two additional setups.  
