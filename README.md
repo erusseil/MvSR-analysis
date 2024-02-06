@@ -1,4 +1,4 @@
-This repository contains the code used to generate results shown in (Russeil *et al.*, 2024,  Multi-View Symbolic Regression)[add arxiv link here once available].  
+This repository contains the code used to generate results shown in [Russeil *et al.*, 2024,  Multi-View Symbolic Regression]().  
 
 - The artificial benchmark dataset can be generated using the `generate_data.py` file.
 - The real datasets from chemistry, finance and astrophysics are available in the `real_data` folder.
