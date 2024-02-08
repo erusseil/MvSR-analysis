@@ -1,4 +1,4 @@
-This repository contains the code used to generate results shown in [Russeil *et al.*, 2024,  Multi-View Symbolic Regression]().  
+This repository contains the code used to generate results shown in [Russeil *et al.*, 2024,  Multi-View Symbolic Regression](https://arxiv.org/abs/2402.04298).  
 
 ## Content
 
