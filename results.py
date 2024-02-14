@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sympy import sympify, Symbol, exp, log
 import matplotlib.colors
+import os
 
 plt.rcParams["font.size"] = 20
 
@@ -69,6 +70,9 @@ def treesize(expr):
         tot += treesize(a)
     return tot
 
+for createfolders in ['boxplots', 'plot', 'heat']:
+    if not os.path.exists(createfolders):
+            os.makedirs(createfolders)
 
 for d in datasets:
     print(d)
