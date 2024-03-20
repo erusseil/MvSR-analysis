@@ -35,7 +35,7 @@ And line 1836 becomes
 
 ## Second requirement  
 
-The pyoperon version used includes some adaptations to make MvSR possible. Therefore the specific branch: https://github.com/heal-research/pyoperon/tree/cpp17 should be installed.
+The pyoperon version used includes some adaptations to make MvSR possible (https://github.com/heal-research/pyoperon/tree/cpp17).
 Therefore the following wheel should be used : https://github.com/heal-research/pyoperon/releases
 After that you can just 
 ```bash
