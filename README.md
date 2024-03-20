@@ -39,5 +39,5 @@ The pyoperon version used includes some adaptations to make MvSR possible. There
 Therefore the following wheel should be used : https://github.com/heal-research/pyoperon/releases
 After that you can just 
 ```bash
-pip install <wheel-filename>
+pip install wheel-filename
 ```
