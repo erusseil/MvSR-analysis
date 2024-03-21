@@ -178,7 +178,7 @@ def refit_solution(func, path, initial_guess):
     fit = Minuit(least_squares, **initial_guess)
     fit.migrad()
     y_pred = func(X, *fit.values)
-
+    y_pred = np.where(y_pred<1e50, y_pred, 1e50)
     MSE_mvsr = mean_squared_error(y, y_pred)
     return MSE_mvsr
 
