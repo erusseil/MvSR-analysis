@@ -36,9 +36,28 @@ And line 1836 becomes
 ## Second requirement  
 
 The pyoperon version used includes some adaptations to make MvSR possible.
-Therefore the following wheel should be used : https://github.com/erusseil/MvSR-analysis/files/14389428/pyoperon-wheel.zip
+Therefore the following wheel should be used : https://github.com/erusseil/MvSR-analysis/files/14389428/pyoperon-wheel.zip (compatible with Python 3.8, 3.9, 3.10, 3.11)
 
 After that you can just:
 ```bash
 pip install wheel-filename
 ```
+
+## Installation instructions
+
+This step-by-step will ensure the installation of the correct version of the adapted Operon:
+
+- Install PyEnv (https://github.com/pyenv/pyenv?tab=readme-ov-file#installation)
+- Run these commands:
+
+```bash
+pyenv install 3.11
+pyenv shell 3.11
+python3.11 -m venv mvsrenv
+source mvsrenv/bin/activate
+pip3.11 install wheels/pyoperon-0.3.6-cp311-cp311-linux_x86_64.whl
+pip3.11 install -r requirement.txt
+```
+- Edit the file `mvsrenv/lib/python3.11/site-packages/iminuit/cost.py` and replace
+   * line 1827 with `self._ndim = x.shape[0]`
+   * line 1836 with `x = self._masked.T[: self._ndim]`
