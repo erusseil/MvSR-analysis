@@ -19,29 +19,6 @@ Folders:
 
 To run the code, in addition to the dependencies listed in the  `requirement.txt` file, it requires two additional setups.  
 
-## First requirement
-
-The iminuit version we use has been modify to fix an occuring error from version 2.24. The `cost.py` file was modified so that:
-
-Line 1827 becomes 
-```bash
-self._ndim = x.shape[0]
-```
-
-And line 1836 becomes
-```bash
- x = self._masked.T[: self._ndim]
-```
-
-## Second requirement  
-
-The pyoperon version used includes some adaptations to make MvSR possible.
-Therefore the following wheel should be used : https://github.com/erusseil/MvSR-analysis/files/14389428/pyoperon-wheel.zip (compatible with Python 3.8, 3.9, 3.10, 3.11)
-
-After that you can just:
-```bash
-pip install wheel-filename
-```
 
 ## Installation instructions
 
