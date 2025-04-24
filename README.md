@@ -1,4 +1,4 @@
-This repository contains the code used to generate results shown in [Russeil *et al.*, 2024,  Multi-View Symbolic Regression](https://arxiv.org/abs/2402.04298). **A user friendly version of MvSR is now available here : https://github.com/erusseil/MvSR_python**
+This repository contains the code used to generate results shown in [Russeil *et al.*, 2024,  Multi-View Symbolic Regression](https://arxiv.org/abs/2402.04298). **A modern and user friendly implementation of MvSR is now available here : [https://github.com/folivetti/pyeggp]. See pyeggp/test/mvsr_example.ipynb**
 
 ## Content
 
